@@ -17,69 +17,73 @@
 
 int main(int argc, char *argv[])
 {
-    ConfigLoader *configLoader = new ConfigLoader();
+    // Check if root privileges are available
     if (getuid())
     {
-        printf("MUST RUN AS ROOT!\n");
+        std::cout << "MUST RUN AS ROOT!\n";
         return -1;
     }
+
+    // Check if the game process is running
     if (mem::GetPID() == 0)
     {
-        printf("GAME NOT FOUND. EXITING!\n");
+        std::cout << "GAME NOT FOUND. EXITING!\n";
         return -1;
     }
-    Level *level = new Level();
-    LocalPlayer *localPlayer = new LocalPlayer();
-    X11Utils *x11Utils = new X11Utils();
-    std::vector<Player *> *players = new std::vector<Player *>;
-    for (int i = 0; i < 60; i++)
-    {
-        players->push_back(new Player(i));
-    }
-    Sense *sense = new Sense(configLoader, level, localPlayer, players, x11Utils);
-    NoRecoil *noRecoil = new NoRecoil(configLoader, level, localPlayer, players, x11Utils);
-    Aimbot *aimbot = new Aimbot(configLoader, level, localPlayer, players, x11Utils);
 
-    // Main loop
-    printf("MYAPEX STARTING MAIN LOOP\n");
+    // Create objects needed for the main loop
+    ConfigLoader configLoader;
+    Level level;
+    LocalPlayer localPlayer;
+    X11Utils x11Utils;
+    std::vector<Player> players(60);
+    Sense sense(&configLoader, &level, &localPlayer, &players, &x11Utils);
+    NoRecoil noRecoil(&configLoader, &level, &localPlayer, &players, &x11Utils);
+    Aimbot aimbot(&configLoader, &level, &localPlayer, &players, &x11Utils);
+
+    std::cout << "MYAPEX STARTING MAIN LOOP\n";
+
     int counter = 0;
     while (1)
     {
         try
         {
+            // Reload the config file if there have been any updates
             if (counter % 200 == 0)
-                configLoader->reloadFile(); // will attempt to reload config if there have been any updates to it
+                configLoader.reloadFile();
 
-            // resolve pointers
-            localPlayer->markForPointerResolution();
-            for (int i = 0; i < players->size(); i++)
+            // Resolve pointers
+            localPlayer.markForPointerResolution();
+            for (auto& player : players)
             {
-                Player *player = players->at(i);
-                player->markForPointerResolution();
+                player.markForPointerResolution();
             }
 
-            // run features
-            if (configLoader->isAimbotOn())
-                aimbot->update();
+            // Run features
+            if (configLoader.isAimbotOn())
+                aimbot.update();
 
-            if (configLoader->isNorecoilOn())
-                noRecoil->update();
+            if (configLoader.isNorecoilOn())
+                noRecoil.update();
 
-            if (configLoader->isSenseOn())
-                sense->update();
+            if (configLoader.isSenseOn())
+                sense.update();
 
-            // all ran fine
+            // All ran fine
             if (counter % 1000 == 0)
-                printf("UPDATE[%d] OK. \n", counter);
+                std::cout << "UPDATE[" << counter << "] OK. \n";
+
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         catch (...)
         {
-            printf("UPDATE[%d] ERROR (LOADING SCREEN?). SLEEPING FOR 10 SECONDS\n", counter);
+            std::cout << "UPDATE[" << counter << "] ERROR (LOADING SCREEN?). SLEEPING FOR 10 SECONDS\n";
             std::this_thread::sleep_for(std::chrono::seconds(10));
         }
+
         counter++;
         if (counter > 1000)
             counter = 0;
     }
 }
+
